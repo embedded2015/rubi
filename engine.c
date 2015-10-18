@@ -8,8 +8,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include <sys/mman.h>
-#include <sys/wait.h>
 
 struct {
     uint32_t addr[0xff];
@@ -21,11 +19,6 @@ static void set_xor128() { w = 1234 + (getpid() ^ 0xFFBA9285); }
 
 void init()
 {
-    long memsz = 0xFFFF + 1;
-    if (posix_memalign((void **) &ntvCode, memsz, memsz))
-        perror("posix_memalign");
-    if (mprotect(ntvCode, memsz, PROT_READ | PROT_WRITE | PROT_EXEC))
-        perror("mprotect");
     tok.pos = ntvCount = 0;
     tok.size = 0xfff;
     set_xor128();

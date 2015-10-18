@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-unsigned char *ntvCode;
+unsigned char ntvCode[0x10000] __attribute__((aligned(4)));
 int ntvCount;
 
 enum { EAX = 0, ECX, EDX, EBX, ESP, EBP, ESI, EDI };
