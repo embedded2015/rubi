@@ -38,7 +38,6 @@ static void freeAddr()
 
 void dispose()
 {
-    free(ntvCode);
     free(brks.addr);
     free(rets.addr);
     free(tok.tok);
