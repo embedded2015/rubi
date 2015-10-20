@@ -2,6 +2,16 @@
 #include "parser.h"
 #include "asm.h"
 
+#include "dynasm/dasm_x86.h"
+#if _WIN32
+#include <Windows.h>
+#else
+#include <sys/mman.h>
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -14,6 +24,12 @@ struct {
     int count;
 } mem;
 
+|.arch x86
+|.globals L
+|.actionlist rubiactions
+dasm_State* d;
+static void* rubilabels[L_MAX];
+
 static unsigned int w;
 static void set_xor128() { w = 1234 + (getpid() ^ 0xFFBA9285); }
 
@@ -25,6 +41,9 @@ void init()
     tok.tok = calloc(sizeof(Token), tok.size);
     brks.addr = calloc(sizeof(uint32_t), 1);
     rets.addr = calloc(sizeof(uint32_t), 1);
+    dasm_init(&d, 1);
+    dasm_setupglobal(&d, rubilabels, L_MAX);
+    dasm_setup(&d, rubiactions);
 }
 
 static void freeAddr()
@@ -124,12 +143,35 @@ static void *funcTable[] = {
     free,    /* 48 */ freeAddr  /* 52 */
 };
 
+static void* link() {
+    size_t sz;
+    void* ntvCode;
+    dasm_link(&d, &sz);
+#ifdef _WIN32
+    ntvCode = VirtualAlloc(0, sz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+#else
+    ntvCode = mmap(0, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#endif
+    dasm_encode(&d, ntvCode);
+#ifdef _WIN32
+    {DWORD dwOld; VirtualProtect(ntvCode, sz, PAGE_EXECUTE_READ, &dwOld); }
+#else
+    mprotect(ntvCode, sz, PROT_READ | PROT_EXEC);
+#endif
+    return ntvCode;
+}
+
 static int execute(char *source)
 {
     init();
     lex(source);
+
     parser();
+    void* ntvCode_ = link();
+
+    // TODO: fixme
     ((int (*)(int *, void **)) ntvCode)(0, funcTable);
+
     dispose();
     return 0;
 }

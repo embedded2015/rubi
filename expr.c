@@ -7,6 +7,8 @@
 #include "asm.h"
 #include "parser.h"
 
+|.arch x86
+
 extern int make_stdfunc(char *);
 
 static inline int32_t isIndex() { return !strcmp(tok.tok[tok.pos].val, "["); }

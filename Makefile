@@ -1,20 +1,25 @@
-CFLAGS = -Wall -m32 -std=gnu99 -O2
+ARCH = WIN
+CC = gcc
+CFLAGS = -Wall -m32 -g -std=gnu99
 C = $(CC) $(CFLAGS)
 
 rubi: engine.o expr.o parser.o stdlib.o
 	$(C) -o $@ $^
 
-engine.o: rubi.h engine.c
-	$(C) -c engine.c
+%.$(ARCH).c: %.c
+	minilua dynasm/dynasm.lua -o $@ -D $(ARCH) $<
 
-expr.o: expr.h expr.c asm.h
-	$(C) -c expr.c
+engine.o: rubi.h engine.$(ARCH).c
+	$(C) -o $@ -c engine.$(ARCH).c
 
-parser.o: parser.h parser.c asm.h
-	$(C) -c parser.c
+expr.o: expr.h expr.$(ARCH).c asm.h
+	$(C) -o $@ -c expr.$(ARCH).c
+
+parser.o: parser.h parser.$(ARCH).c asm.h
+	$(C) -o $@ -c parser.$(ARCH).c
 
 stdlib.o: stdlib.c asm.h expr.h
 	$(C) -c stdlib.c
 
 clean:
-	$(RM) a.out rubi *.o *~ text
+	$(RM) a.out rubi *.o *~ text *.$(ARCH).c

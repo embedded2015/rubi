@@ -8,6 +8,8 @@
 #include "expr.h"
 #include "asm.h"
 
+|.arch x86
+
 struct {
     Variable var[0xFF];
     int count;

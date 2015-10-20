@@ -1,6 +1,10 @@
 #ifndef RUBI_INCLUDED
 #define RUBI_INCLUDED
 
+#include "dynasm/dasm_proto.h"
+extern dasm_State* d;
+
+
 enum { IN_GLOBAL = 0, IN_FUNC };
 
 enum { BLOCK_LOOP = 1, BLOCK_FUNC };
