@@ -4,6 +4,7 @@
 #include "dynasm/dasm_proto.h"
 extern dasm_State* d;
 
+#include <stdint.h>
 
 enum { IN_GLOBAL = 0, IN_FUNC };
 

@@ -1,6 +1,5 @@
 #include "rubi.h"
 #include "parser.h"
-#include "asm.h"
 
 #include "dynasm/dasm_x86.h"
 #if _WIN32
@@ -25,24 +24,27 @@ struct {
 } mem;
 
 |.arch x86
-|.globals L
+|.globals L_
 |.actionlist rubiactions
 dasm_State* d;
-static void* rubilabels[L_MAX];
+static dasm_State** Dst = &d;
+static void* rubilabels[L__MAX];
+static void* jit_buf;
+static size_t jit_sz;
 
 static unsigned int w;
 static void set_xor128() { w = 1234 + (getpid() ^ 0xFFBA9285); }
 
 void init()
 {
-    tok.pos = ntvCount = 0;
+    tok.pos = 0;
     tok.size = 0xfff;
     set_xor128();
     tok.tok = calloc(sizeof(Token), tok.size);
     brks.addr = calloc(sizeof(uint32_t), 1);
     rets.addr = calloc(sizeof(uint32_t), 1);
     dasm_init(&d, 1);
-    dasm_setupglobal(&d, rubilabels, L_MAX);
+    dasm_setupglobal(&d, rubilabels, L__MAX);
     dasm_setup(&d, rubiactions);
 }
 
@@ -57,6 +59,11 @@ static void freeAddr()
 
 void dispose()
 {
+#ifdef _WIN32
+    VirtualFree(jit_buf, 0, MEM_RELEASE);
+#else
+    munmap(jit_buf, jit_sz);
+#endif
     free(brks.addr);
     free(rets.addr);
     free(tok.tok);
@@ -143,22 +150,22 @@ static void *funcTable[] = {
     free,    /* 48 */ freeAddr  /* 52 */
 };
 
-static void* link_and_encode() {
-    size_t sz;
-    void* ntvCode;
-    dasm_link(&d, &sz);
+static void* finalize() {
+    void* jit_buf;
+    dasm_link(&d, &jit_sz);
 #ifdef _WIN32
-    ntvCode = VirtualAlloc(0, sz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    jit_buf = VirtualAlloc(0, jit_sz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 #else
-    ntvCode = mmap(0, sz, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    jit_buf = mmap(0, jit_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #endif
-    dasm_encode(&d, ntvCode);
+    dasm_encode(&d, jit_buf);
 #ifdef _WIN32
-    {DWORD dwOld; VirtualProtect(ntvCode, sz, PAGE_EXECUTE_READ, &dwOld); }
+    {DWORD dwOld; VirtualProtect(jit_buf, jit_sz, PAGE_EXECUTE_READ, &dwOld); }
 #else
-    mprotect(ntvCode, sz, PROT_READ | PROT_EXEC);
+    mprotect(jit_buf, jit_sz, PROT_READ | PROT_EXEC);
 #endif
-    return ntvCode;
+    dasm_free(&d);
+    return jit_buf;
 }
 
 static int execute(char *source)
@@ -166,11 +173,12 @@ static int execute(char *source)
     init();
     lex(source);
 
+    |->START:
     parser();
-    void* ntvCode_ = link_and_encode();
 
-    // TODO: fixme
-    ((int (*)(int *, void **)) ntvCode)(0, funcTable);
+    finalize();
+
+    ((int (*)(int *, void **))rubilabels[L_START])(0, funcTable);
 
     dispose();
     return 0;

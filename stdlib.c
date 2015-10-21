@@ -1,6 +1,5 @@
 #include <string.h>
 #include "expr.h"
-#include "asm.h"
 
 typedef struct {
     char *name;
@@ -20,31 +19,31 @@ int make_stdfunc(char *name)
         if (!strcmp(stdfunc[i].name, name)) {
             if(!strcmp(name, "Array")) {
                 relExpr(); // get array size
-                emit(0xc1); emit(0xe0 + EAX); emit(2); // shl eax 2
-                emit(0x89); emit(0x04); emit(0x24); // mov [esp], eax
-                emit(0xff); emit(0x56); emit(12); // call malloc
-                emit(0x50 + EAX); // push eax
-                emit(0x89); emit(0x04); emit(0x24); // mov [esp], eax
-                emit(0xff); emit(0x56); emit(24); // call add_mem
-                emit(0x58 + EAX); // pop eax
+    //             emit(0xc1); emit(0xe0 + EAX); emit(2); // shl eax 2
+    //             emit(0x89); emit(0x04); emit(0x24); // mov [esp], eax
+    //             emit(0xff); emit(0x56); emit(12); // call malloc
+    //             emit(0x50 + EAX); // push eax
+    //             emit(0x89); emit(0x04); emit(0x24); // mov [esp], eax
+    //             emit(0xff); emit(0x56); emit(24); // call add_mem
+    //             emit(0x58 + EAX); // pop eax
             } else {
                 if (stdfunc[i].args == -1) { // vector
                     uint32_t a = 0;
                     do {
                         relExpr();
-                        emit(0x89); emit(0x44); emit(0x24); emit(a);
+    //                     emit(0x89); emit(0x44); emit(0x24); emit(a);
                             // mov [esp+a], eax
                         a += 4;
                     } while(skip(","));
                 } else {
                     for(int arg = 0; arg < stdfunc[i].args; arg++) {
                         relExpr();
-                        emit(0x89); emit(0x44); emit(0x24); emit(arg * 4);
+    //                     emit(0x89); emit(0x44); emit(0x24); emit(arg * 4);
                             // mov [esp+arg*4], eax
                         skip(",");
                     }
                 }
-                emit(0xff); emit(0x56); emit(stdfunc[i].addr);
+    //             emit(0xff); emit(0x56); emit(stdfunc[i].addr);
                     // call $function
             }
             return 1;

@@ -12,13 +12,13 @@ rubi: engine.o expr.o parser.o stdlib.o
 engine.o: rubi.h engine.$(ARCH).c
 	$(C) -o $@ -c engine.$(ARCH).c
 
-expr.o: expr.h expr.$(ARCH).c asm.h
+expr.o: expr.h expr.$(ARCH).c
 	$(C) -o $@ -c expr.$(ARCH).c
 
-parser.o: parser.h parser.$(ARCH).c asm.h
+parser.o: parser.h parser.$(ARCH).c
 	$(C) -o $@ -c parser.$(ARCH).c
 
-stdlib.o: stdlib.c asm.h expr.h
+stdlib.o: stdlib.c expr.h
 	$(C) -c stdlib.c
 
 clean:
