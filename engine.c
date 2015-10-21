@@ -143,7 +143,7 @@ static void *funcTable[] = {
     free,    /* 48 */ freeAddr  /* 52 */
 };
 
-static void* link() {
+static void* link_and_encode() {
     size_t sz;
     void* ntvCode;
     dasm_link(&d, &sz);
@@ -167,7 +167,7 @@ static int execute(char *source)
     lex(source);
 
     parser();
-    void* ntvCode_ = link();
+    void* ntvCode_ = link_and_encode();
 
     // TODO: fixme
     ((int (*)(int *, void **)) ntvCode)(0, funcTable);
