@@ -3,6 +3,9 @@
 
 #include "rubi.h"
 
+extern void* jit_buf;
+extern size_t jit_sz;
+
 typedef struct {
     int address, args;
     char name[0xFF];
@@ -10,7 +13,7 @@ typedef struct {
 
 int expression(int, int);
 
-int parser();
+int (*parser())(int *, void **);
 int getString();
 
 func_t *getFunc(char *);

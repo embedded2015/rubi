@@ -1,7 +1,6 @@
 #include "rubi.h"
 #include "parser.h"
 
-#include "dynasm/dasm_x86.h"
 #if _WIN32
 #include <Windows.h>
 #else
@@ -23,15 +22,6 @@ struct {
     int count;
 } mem;
 
-|.arch x86
-|.globals L_
-|.actionlist rubiactions
-dasm_State* d;
-static dasm_State** Dst = &d;
-static void* rubilabels[L__MAX];
-static void* jit_buf;
-static size_t jit_sz;
-
 static unsigned int w;
 static void set_xor128() { w = 1234 + (getpid() ^ 0xFFBA9285); }
 
@@ -43,9 +33,6 @@ void init()
     tok.tok = calloc(sizeof(Token), tok.size);
     brks.addr = calloc(sizeof(uint32_t), 1);
     rets.addr = calloc(sizeof(uint32_t), 1);
-    dasm_init(&d, 1);
-    dasm_setupglobal(&d, rubilabels, L__MAX);
-    dasm_setup(&d, rubiactions);
 }
 
 static void freeAddr()
@@ -150,35 +137,15 @@ static void *funcTable[] = {
     free,    /* 48 */ freeAddr  /* 52 */
 };
 
-static void* finalize() {
-    void* jit_buf;
-    dasm_link(&d, &jit_sz);
-#ifdef _WIN32
-    jit_buf = VirtualAlloc(0, jit_sz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-#else
-    jit_buf = mmap(0, jit_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#endif
-    dasm_encode(&d, jit_buf);
-#ifdef _WIN32
-    {DWORD dwOld; VirtualProtect(jit_buf, jit_sz, PAGE_EXECUTE_READ, &dwOld); }
-#else
-    mprotect(jit_buf, jit_sz, PROT_READ | PROT_EXEC);
-#endif
-    dasm_free(&d);
-    return jit_buf;
-}
-
 static int execute(char *source)
 {
     init();
     lex(source);
 
-    |->START:
-    parser();
+    int (*jit_main)(int*, void**) = parser();
 
-    finalize();
-
-    ((int (*)(int *, void **))rubilabels[L_START])(0, funcTable);
+    int res = jit_main(0, funcTable);
+    printf("=> %d\n", res);
 
     dispose();
     return 0;

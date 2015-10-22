@@ -1,3 +1,14 @@
+#include "dynasm/dasm_proto.h"
+#include "dynasm/dasm_x86.h"
+#if _WIN32
+#include <Windows.h>
+#else
+#include <sys/mman.h>
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +19,14 @@
 #include "expr.h"
 
 |.arch x86
+|.globals L_
+|.actionlist rubiactions
+
+dasm_State* d;
+static dasm_State** Dst = &d;
+void* rubilabels[L__MAX];
+void* jit_buf;
+size_t jit_sz;
 
 struct {
     Variable var[0xFF];
@@ -30,6 +49,29 @@ struct {
 } functions;
 
 #define NON 0
+
+void jit_init() {
+    dasm_init(&d, 1);
+    dasm_setupglobal(&d, rubilabels, L__MAX);
+    dasm_setup(&d, rubiactions);
+}
+
+void* jit_finalize() {
+    dasm_link(&d, &jit_sz);
+#ifdef _WIN32
+    jit_buf = VirtualAlloc(0, jit_sz, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+#else
+    jit_buf = mmap(0, jit_sz, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#endif
+    dasm_encode(&d, jit_buf);
+#ifdef _WIN32
+    {DWORD dwOld; VirtualProtect(jit_buf, jit_sz, PAGE_EXECUTE_READ, &dwOld); }
+#else
+    mprotect(jit_buf, jit_sz, PROT_READ | PROT_EXEC);
+#endif
+    dasm_free(&d);
+    return jit_buf;
+}
 
 int32_t getString()
 {
@@ -382,15 +424,19 @@ static char *replaceEscape(char *str)
     return str;
 }
 
-int32_t parser()
+int (*parser())(int *, void **)
 {
+    jit_init();
+
     tok.pos = 0;
     strings.addr = calloc(0xFF, sizeof(int32_t));
     uint32_t main_address;
     // emit(0xe9); main_address = ntvCount; emitI32(0);
+    |->START:
     eval(0, 0);
+    | ret
 
-    uint32_t addr = getFunc("main")->address;
+    // uint32_t addr = getFunc("main")->address;
     // emitI32Insert(addr - 5, main_address);
 
     for (strings.addr--; strings.count; strings.addr--) {
@@ -401,7 +447,8 @@ int32_t parser()
     //     emit(0); // '\0'
     }
 
-    return 1;
+    jit_finalize();
+    return ((int (*)(int *, void **))rubilabels[L_START]);
 }
 
 int32_t isassign()
