@@ -6,6 +6,8 @@
 extern void* jit_buf;
 extern size_t jit_sz;
 
+extern int npc;
+
 typedef struct {
     int address, args;
     char name[0xFF];
@@ -14,7 +16,7 @@ typedef struct {
 int expression(int, int);
 
 int (*parser())(int *, void **);
-int getString();
+char* getString();
 
 func_t *getFunc(char *);
 

@@ -28,6 +28,8 @@ void* rubilabels[L__MAX];
 void* jit_buf;
 size_t jit_sz;
 
+int npc;
+
 struct {
     Variable var[0xFF];
     int count;
@@ -65,27 +67,24 @@ void* jit_finalize() {
 #endif
     dasm_encode(&d, jit_buf);
 #ifdef _WIN32
-    {DWORD dwOld; VirtualProtect(jit_buf, jit_sz, PAGE_EXECUTE_READ, &dwOld); }
+    {DWORD dwOld; VirtualProtect(jit_buf, jit_sz, PAGE_EXECUTE_READWRITE, &dwOld); }
 #else
-    mprotect(jit_buf, jit_sz, PROT_READ | PROT_EXEC);
+    mprotect(jit_buf, jit_sz, PROT_READ | PROT_WRITE | PROT_EXEC);
 #endif
-    dasm_free(&d);
     return jit_buf;
 }
 
-int32_t getString()
+char* getString()
 {
     strings.text[ strings.count ] =
         calloc(sizeof(char), strlen(tok.tok[tok.pos].val) + 1);
     strcpy(strings.text[strings.count], tok.tok[tok.pos++].val);
-
-    // *strings.addr++ = ntvCount;
-    return strings.count++;
+    return strings.text[strings.count++];
 }
 
 Variable *getVar(char *name)
 {
-    /* loval variable */
+    /* local variable */
     for (int i = 0; i < varCounter; i++) {
         if (!strcmp(name, locVar[nowFunc][i].name))
             return &locVar[nowFunc][i];
@@ -439,15 +438,11 @@ int (*parser())(int *, void **)
     // uint32_t addr = getFunc("main")->address;
     // emitI32Insert(addr - 5, main_address);
 
-    for (strings.addr--; strings.count; strings.addr--) {
-    //     emitI32Insert((uint32_t) &ntvCode[ntvCount], *strings.addr);
-        replaceEscape(strings.text[--strings.count]);
-    //     for (int32_t i = 0; strings.text[strings.count][i]; i++)
-    //         emit(strings.text[strings.count][i]);
-    //     emit(0); // '\0'
-    }
+    for (int i = 0; i < strings.count; ++i)
+        replaceEscape(strings.text[i]);
 
-    jit_finalize();
+    uint8_t* buf = (uint8_t*)jit_finalize();
+    dasm_free(&d);
     return ((int (*)(int *, void **))rubilabels[L_START]);
 }
 

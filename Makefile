@@ -6,7 +6,7 @@ C = $(CC) $(CFLAGS)
 rubi: engine.o parser.o
 	$(C) -o $@ $^
 
-engine.o: rubi.h
+engine.o: engine.c rubi.h
 	$(C) -o $@ -c engine.c
 
 parser.o: parser.h parser.c expr.c stdlib.c

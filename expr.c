@@ -18,7 +18,8 @@ static void primExpr()
         | mov eax, tok.tok[tok.pos++].val[0]
         skip("'");
     } else if (skip("\"")) { // string?
-    //    emit(0xb8); getString(); emitI32(0x00); // mov eax string_address
+        // mov eax string_address
+        | mov eax, getString()
     } else if (isalpha(tok.tok[tok.pos].val[0])) { // variable or inc or dec
         char *name = tok.tok[tok.pos].val;
         Variable *v;
