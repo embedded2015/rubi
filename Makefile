@@ -1,4 +1,4 @@
-CFLAGS = -Wall -m32 -std=gnu99 -O2
+CFLAGS = -Wall -m32 -mstackrealign -std=gnu99 -O2
 C = $(CC) $(CFLAGS)
 
 rubi: engine.o expr.o parser.o stdlib.o
