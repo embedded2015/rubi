@@ -213,11 +213,14 @@ static Variable *declareVariable()
 
 static int ifStmt()
 {
-    uint32_t end;
     relExpr(); /* if condition */
-    // emit(0x83); emit(0xf8); emit(0x00);// cmp eax, 0
-    // emit(0x75); emit(0x05); // jne 5
-    // emit(0xe9); end = ntvCount; emitI32(0);// jmp
+    uint32_t end = npc++;
+    dasm_growpc(&d, npc);
+    // didn't simply 'jz =>end' to prevent address diff too large
+    | test eax, eax
+    | jnz >1
+    | jmp =>end
+    |1:
     return eval(end, NON);
 }
 
@@ -381,27 +384,34 @@ int expression(int pos, int status)
     } else if(skip("if")) {
         ifStmt();
     } else if(skip("else")) {
-        int32_t end;
-    //     emit(0xe9); end = ntvCount; emitI32(0);// jmp while end
-    //     emitI32Insert(ntvCount - pos - 4, pos);
+        int32_t end = npc++;
+        dasm_growpc(&d, npc);
+        // jmp if/elsif/while end
+        | jmp =>end
+        |=>pos:
         eval(end, NON);
         return 1;
     } else if (skip("elsif")) {
-        int32_t endif, end;
-    //     emit(0xe9); endif = ntvCount; emitI32(0);// jmp while end
-    //     emitI32Insert(ntvCount - pos - 4, pos);
+        int32_t endif = npc++;
+        dasm_growpc(&d, npc);
+        // jmp if/elsif/while end
+        | jmp =>endif
+        |=>pos:
         relExpr(); /* if condition */
-    //     emit(0x83); emit(0xf8); emit(0x00);// cmp eax, 0
-    //     emit(0x75); emit(0x05); // jne 5
-    //     emit(0xe9); end = ntvCount; emitI32(0);// jmp while end
+        uint32_t end = npc++;
+        dasm_growpc(&d, npc);
+        | test eax, eax
+        | jnz >1
+        | jmp =>end
+        |1:
         eval(end, NON);
-    //     emitI32Insert(ntvCount - endif - 4, endif);
+        |=>endif:
         return 1;
     } else if (skip("break")) {
         appendBreak();
     } else if (skip("end")) {
         if (status == NON) {
-    //         emitI32Insert(ntvCount - pos - 4, pos);
+            |=>pos:
         } else if (status == BLOCK_FUNC) functions.inside = IN_GLOBAL;
         return 1;
     } else if (!skip(";")) { relExpr(); }
