@@ -309,7 +309,7 @@ int expression(int pos, int status)
         if (isassign()) assignment();
     } else if (skip("def")) {
         functionStmt();
-    } else if (functions.inside == IN_GLOBAL &&
+    } else if (0 && functions.inside == IN_GLOBAL &&
                strcmp("def", tok.tok[tok.pos+1].val) &&
                strcmp("$", tok.tok[tok.pos+1].val) &&
                strcmp(";", tok.tok[tok.pos+1].val)) { // main function entry
@@ -355,19 +355,21 @@ int expression(int pos, int status)
             | call dword [esi + 0x8]
         }
     } else if(skip("printf")) {
+        // support maximum 5 arguments for now
         if (skip("\"")) {
-    //         emit(0xb8); getString(); emitI32(0x00); // mov eax string_address
-    //         emit(0x89); emit(0x44); emit(0x24); emit(0x00); // mov [esp+0], eax
+            // mov eax string_address
+            | mov eax, getString()
+            | mov [esp], eax
         }
         if (skip(",")) {
             uint32_t a = 4;
             do {
                 relExpr();
-    //             emit(0x89); emit(0x44); emit(0x24); emit(a); // mov [esp+a], eax
+                | mov [esp + a], eax
                 a += 4;
             } while(skip(","));
         }
-    //     emit(0xff); emit(0x56); emit(12 + 8); // call printf
+        | call dword [esi + 0x14]
     } else if (skip("for")) {
         assignment();
         skip(",");
@@ -434,6 +436,7 @@ int (*parser())(int *, void **)
     |->START:
     | push ebp
     | mov ebp, esp
+    | sub esp, 0x18
     | mov esi, [ebp + 12]
     eval(0, 0);
     | leave
