@@ -140,9 +140,11 @@ static func_t *appendFunc(char *name, int address, int args)
 static int32_t appendBreak()
 {
     // emit(0xe9); // jmp
+    uint32_t lbl = npc++;
+    dasm_growpc(&d, npc);
+    | jmp =>lbl
     brks.addr = realloc(brks.addr, 4 * (brks.count + 1));
-    // brks.addr[brks.count] = ntvCount;
-    // emitI32(0);
+    brks.addr[brks.count] = lbl;
     return brks.count++;
 }
 
@@ -226,17 +228,23 @@ static int ifStmt()
 
 static int whileStmt()
 {
-    uint32_t loopBgn /* = ntvCount */, end, stepBgn[2], stepOn = 0;
+    uint32_t loopBgn = npc++;
+    dasm_growpc(&d, npc);
+    |=>loopBgn:
     relExpr(); /* condition */
+    uint32_t stepBgn[2], stepOn = 0;
     if (skip(",")) {
         stepOn = 1;
         stepBgn[0] = tok.pos;
         for (; tok.tok[tok.pos].val[0] != ';'; tok.pos++)
             /* next */;
     }
-    // emit(0x83); emit(0xf8); emit(0x00);// cmp eax, 0
-    // emit(0x75); emit(0x05); // jne 5
-    // emit(0xe9); end = ntvCount; emitI32(0);// jmp while end
+    uint32_t end = npc++;
+    dasm_growpc(&d, npc);
+    | test eax, eax
+    | jnz >1
+    | jmp =>end
+    |1:
 
     if (skip(":")) expression(0, BLOCK_LOOP);
     else eval(0, BLOCK_LOOP);
@@ -247,13 +255,11 @@ static int whileStmt()
         if (isassign()) assignment();
         tok.pos = stepBgn[1];
     }
-    uint32_t n; // = 0xFFFFFFFF - ntvCount + loopBgn - 4;
-    // emit(0xe9); emitI32(n); // jmp n
-    // emitI32Insert(ntvCount - end - 4, end);
+    | jmp =>loopBgn
+    |=>end:
 
-    // for (--brks.count; brks.count >= 0; brks.count--)
-    //     emitI32Insert(ntvCount - brks.addr[brks.count] - 4,
-    //                   brks.addr[brks.count]);
+    for (--brks.count; brks.count >= 0; brks.count--)
+        |=>brks.addr[brks.count]:
     brks.count = 0;
 
     return 0;
