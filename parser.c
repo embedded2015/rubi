@@ -375,7 +375,7 @@ static char *replaceEscape(char *str)
         char *pos;
         while ((pos = strstr(str, escape[i])) != NULL) {
             *pos = escape[i + 1][0];
-            memmove(pos + 1, pos + 2, strlen(str) - 2 + 1);
+            memmove(pos + 1, pos + 2, strlen(pos + 2) + 1);
         }
     }
     return str;
