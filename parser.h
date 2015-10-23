@@ -3,6 +3,8 @@
 
 #include "rubi.h"
 
+#include <stddef.h>
+
 extern void* jit_buf;
 extern size_t jit_sz;
 
