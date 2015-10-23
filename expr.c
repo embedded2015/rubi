@@ -38,7 +38,7 @@ static void primExpr()
                     | mov edx, [ebp - v->id*4]
                 } else if (v->loctype == V_GLOBAL) {
                     // mov edx, GLOBAL_ADDR
-                    | mov edx, v->id
+                    | mov edx, [v->id]
                 }
 
                 if (v->type == T_INT) {
@@ -80,7 +80,7 @@ static void primExpr()
                     | mov eax, [ebp - v->id*4]
                 } else if (v->loctype == V_GLOBAL) {
                     // mov eax GLOBAL_ADDR
-                    | mov eax, v->id
+                    | mov eax, [v->id]
                 }
             }
         }

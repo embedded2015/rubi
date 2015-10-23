@@ -29,10 +29,12 @@ void* jit_buf;
 size_t jit_sz;
 
 int npc;
+static int main_address, main_esp, mainFunc;
 
 struct {
     Variable var[0xFF];
     int count;
+    int data[0xFF];
 } gblVar;
 
 static Variable locVar[0xFF][0xFF];
@@ -112,9 +114,7 @@ static Variable *appendVar(char *name, int type)
         strcpy(gblVar.var[gblVar.count].name, name);
         gblVar.var[gblVar.count].type = type;
         gblVar.var[gblVar.count].loctype = V_GLOBAL;
-    //     gblVar.var[gblVar.count].id = (uint32_t) &ntvCode[ntvCount];
-    //     ntvCount += sizeof(int32_t); /* type */
-
+        gblVar.var[gblVar.count].id = (int)&gblVar.data[gblVar.count];
         return &gblVar.var[gblVar.count++];
     }
     return NULL;
@@ -139,7 +139,6 @@ static func_t *appendFunc(char *name, int address, int args)
 
 static int32_t appendBreak()
 {
-    // emit(0xe9); // jmp
     uint32_t lbl = npc++;
     dasm_growpc(&d, npc);
     | jmp =>lbl
@@ -318,26 +317,27 @@ int expression(int pos, int status)
         if (isassign()) assignment();
     } else if (skip("def")) {
         functionStmt();
-    } else if (0 && functions.inside == IN_GLOBAL &&
+    } else if (functions.inside == IN_GLOBAL &&
                strcmp("def", tok.tok[tok.pos+1].val) &&
                strcmp("$", tok.tok[tok.pos+1].val) &&
-               strcmp(";", tok.tok[tok.pos+1].val)) { // main function entry
+               (tok.pos+1 == tok.size || strcmp(";", tok.tok[tok.pos+1].val))) { // main function entry
         functions.inside = IN_FUNC;
-        nowFunc++;
-    //    appendFunc("main", ntvCount, 0); // append function
-    //     emit(0x50 + EBP); // push ebp
-    //     emit(0x89); emit(0xc0 + ESP * 8 + EBP); // mov ebp esp
-    //     uint32_t espBgn = ntvCount + 2;
-    //     emit(0x81); emit(0xe8 + ESP); emitI32(0); // sub esp 0
-    //     emit(0x8b); emit(0x75); emit(0x0c); // mov esi, 0xc(%ebp)
+        mainFunc = ++nowFunc;
 
+        //    appendFunc("main", ntvCount, 0); // append function
+        main_esp = npc++;
+        dasm_growpc(&d, npc);
+
+        |=>main_address:
+        | push ebp
+        | mov ebp, esp
+        | sub esp, 0x80000000
+        |=>main_esp:
+        | mov esi, [ebp + 12]
         eval(0, NON);
+        | leave
+        | ret
 
-    //     emit(0x81); emit(0xc4);
-    //     emitI32(sizeof(int32_t) * (varSize[nowFunc] + 6)); // add %esp nn
-    //     emit(0xc9);// leave
-    //     emit(0xc3);// ret
-    //     emitI32Insert(sizeof(int32_t) * (varSize[nowFunc] + 6), espBgn);
         functions.inside = IN_GLOBAL;
     } else if (isassign()) {
         assignment();
@@ -447,24 +447,20 @@ int (*parser())(int *, void **)
 
     tok.pos = 0;
     strings.addr = calloc(0xFF, sizeof(int32_t));
-    uint32_t main_address;
-    // emit(0xe9); main_address = ntvCount; emitI32(0);
-    |->START:
-    | push ebp
-    | mov ebp, esp
-    | sub esp, 0x18
-    | mov esi, [ebp + 12]
-    eval(0, 0);
-    | leave
-    | ret
+    main_address = npc++;
+    dasm_growpc(&d, npc);
 
-    // uint32_t addr = getFunc("main")->address;
-    // emitI32Insert(addr - 5, main_address);
+    |->START:
+    | jmp =>main_address
+    eval(0, 0);
 
     for (int i = 0; i < strings.count; ++i)
         replaceEscape(strings.text[i]);
 
     uint8_t* buf = (uint8_t*)jit_finalize();
+
+    *(int*)(buf + dasm_getpclabel(&d, main_esp) - 4) = (varSize[mainFunc] + 6)*4;
+
     dasm_free(&d);
     return ((int (*)(int *, void **))rubilabels[L_START]);
 }
@@ -499,48 +495,44 @@ int32_t assignment()
     }
     tok.pos++;
 
+    int siz = (v->type == T_INT ? sizeof(int32_t) :
+               v->type == T_STRING ? sizeof(int32_t *) :
+               v->type == T_DOUBLE ? sizeof(double) : 4);
+
     if (v->loctype == V_LOCAL) {
         if (skip("[")) { // Array?
             relExpr();
-    //         emit(0x50 + EAX); // push eax
+            | push eax
             if (skip("]") && skip("=")) {
                 relExpr();
-    //             emit(0x8b); emit(0x4d);
-    //             emit(256 -
-    //                     (v->type == T_INT ? sizeof(int32_t) :
-    //                      v->type == T_STRING ? sizeof(int32_t *) :
-    //                      v->type == T_DOUBLE ? sizeof(double) : 4) * v->id);
-                    // mov ecx [ebp-n]
-    //             emit(0x58 + EDX); // pop edx
+                // mov ecx, array
+                | mov ecx, [ebp - siz*v->id]
+                | pop edx
                 if (v->type == T_INT) {
-    //                 emit(0x89); emit(0x04); emit(0x91); // mov [ecx+edx*4], eax
+                    | mov [ecx+edx*4], eax
                 } else {
-    //                 emit(0x89); emit(0x04); emit(0x11); // mov [ecx+edx], eax
+                    | mov [ecx+edx], eax
                 }
             } else if ((inc = skip("++")) || (dec = skip("--"))) {
+                // TODO
             } else 
                 error("%d: invalid assignment", tok.tok[tok.pos].nline);
         } else { // Scalar?
             if(skip("=")) {
                 relExpr();
             } else if((inc = skip("++")) || (dec = skip("--"))) {
-    //             emit(0x8b); emit(0x45);
-    //             emit(256 -
-    //                     (v->type == T_INT ? sizeof(int32_t) :
-    //                      v->type == T_STRING ? sizeof(int32_t *) :
-    //                      v->type == T_DOUBLE ? sizeof(double) : 4) * v->id);
-                    // mov eax varaible
-    //             emit(0x50 + EAX); // push eax
-    //             if (inc) emit(0x40); // inc eax
-    //             else if(dec) emit(0x48); // dec eax
+                // mov eax, varaible
+                | mov eax, [ebp - siz*v->id]
+                | push eax
+                if (inc)
+                    | inc eax
+                else if(dec)
+                    | dec eax
             }
-    //         emit(0x89); emit(0x45);
-    //         emit(256 -
-    //                 (v->type == T_INT ? sizeof(int32_t) :
-    //                  v->type == T_STRING ? sizeof(int32_t *) :
-    //                  v->type == T_DOUBLE ? sizeof(double) : 4) * v->id);
-                // mov var eax
-    //         if (inc || dec) emit(0x58 + EAX); // pop eax
+            // mov variable, eax
+            | mov [ebp - siz*v->id], eax
+            if (inc || dec)
+                | pop eax
         }
     } else if (v->loctype == V_GLOBAL) {
         if (declare) { // first declare for global variable?
@@ -552,32 +544,35 @@ int32_t assignment()
         } else {
             if (skip("[")) { // Array?
                 relExpr();
-    //              emit(0x50 + EAX); // push eax
+                | push eax
                 if(skip("]") && skip("=")) {
                     relExpr();
-    //                  emit(0x8b); emit(0x0d); emitI32(v->id);
-                        // mov ecx GLOBAL_ADDR
-    //                 emit(0x58 + EDX); // pop edx
+                    // mov ecx GLOBAL_ADDR
+                    | mov ecx, [v->id]
+                    | pop edx
                     if (v->type == T_INT) {
-    //                     emit(0x89); emit(0x04); emit(0x91);
-                            // mov [ecx+edx*4], eax
+                        | mov [ecx + edx*4], eax
                     } else {
-    //                     emit(0x89); emit(0x04); emit(0x11);
-                            // mov [ecx+edx], eax
+                        | mov [edx+edx], eax
                     }
                 } else error("%d: invalid assignment",
                              tok.tok[tok.pos].nline);
             } else if (skip("=")) {
                 relExpr();
-    //             emit(0xa3); emitI32(v->id); // mov GLOBAL_ADDR eax
+                | mov [v->id], eax
             } else if ((inc = skip("++")) || (dec = skip("--"))) {
-    //             emit(0xa1); emitI32(v->id); // mov eax GLOBAL_ADDR
-    //             emit(0x50 + EAX); // push eax
-    //             if (inc) emit(0x40); // inc eax
-    //             else if (dec) emit(0x48); // dec eax
-    //             emit(0xa3); emitI32(v->id); // mov GLOBAL_ADDR eax
+                // mov eax GLOBAL_ADDR
+                | mov eax, [v->id]
+                | push eax
+                if (inc)
+                    | inc eax
+                else if (dec)
+                    | dec eax
+                // mov GLOBAL_ADDR eax
+                | mov [v->id], eax
             }
-    //         if (inc || dec) emit(0x58 + EAX); // pop eax
+            if (inc || dec)
+                | pop eax
         }
     }
     return 0;
