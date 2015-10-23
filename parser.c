@@ -336,23 +336,23 @@ int expression(int pos, int status)
         do {
             int isstring = 0;
             if (skip("\"")) {
-    //             emit(0xb8); getString(); emitI32(0x00);
-                    // mov eax string_address
+                // mov eax string_address
+                | mov eax, getString()
                 isstring = 1;
             } else {
                 relExpr();
             }
-    //         emit(0x50 + EAX); // push eax
+            | push eax
             if (isstring) {
-    //             emit(0xff); emit(0x56); emit(4);// call *0x04(esi) putString
+                | call dword [esi + 4]
             } else {
-    //             emit(0xff); emit(0x16); // call (esi) putNumber
+                | call dword [esi]
             }
-    //         emit(0x81); emit(0xc0 + ESP); emitI32(4); // add esp 4
+            | add esp, 4
         } while (skip(","));
         /* new line ? */
         if (isputs) {
-    //         emit(0xff); emit(0x56); emit(8);// call *0x08(esi) putLN
+            | call dword [esi + 0x8]
         }
     } else if(skip("printf")) {
         if (skip("\"")) {
@@ -432,7 +432,11 @@ int (*parser())(int *, void **)
     uint32_t main_address;
     // emit(0xe9); main_address = ntvCount; emitI32(0);
     |->START:
+    | push ebp
+    | mov ebp, esp
+    | mov esi, [ebp + 12]
     eval(0, 0);
+    | leave
     | ret
 
     // uint32_t addr = getFunc("main")->address;
