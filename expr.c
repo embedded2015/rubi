@@ -159,6 +159,7 @@ static void condExpr()
             | setle al
         else
             | setge al
+
         | movzx eax, al
     }
 }
