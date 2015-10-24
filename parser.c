@@ -29,7 +29,7 @@ void* jit_buf;
 size_t jit_sz;
 
 int npc;
-static int main_address, main_esp, mainFunc;
+static int main_address, mainFunc;
 
 struct {
     Variable var[0xFF];
@@ -129,9 +129,10 @@ func_t *getFunc(char *name)
     return NULL;
 }
 
-static func_t *appendFunc(char *name, int address, int args)
+static func_t *appendFunc(char *name, int address, int espBgn, int args)
 {
     functions.func[functions.count].address = address;
+    functions.func[functions.count].espBgn = espBgn;
     functions.func[functions.count].args = args;
     strcpy(functions.func[functions.count].name, name);
     return &functions.func[functions.count++];
@@ -150,11 +151,15 @@ static int32_t appendBreak()
 static int32_t appendReturn()
 {
     relExpr(); /* get argument */
-    // emit(0xe9); // jmp
+
+    int lbl = npc++;
+    dasm_growpc(&d, npc);
+
+    | jmp =>lbl
+
     rets.addr = realloc(rets.addr, 4 * (rets.count + 1));
     if (rets.addr == NULL) error("no enough memory");
-    // rets.addr[rets.count] = ntvCount;
-    // emitI32(0);
+    rets.addr[rets.count] = lbl;
     return rets.count++;
 }
 
@@ -266,7 +271,7 @@ static int whileStmt()
 
 static int32_t functionStmt()
 {
-    int32_t espBgn, argsc = 0;
+    int32_t argsc = 0;
     char *funcName = tok.tok[tok.pos++].val;
     nowFunc++; functions.inside = IN_FUNC;
     if (skip("(")) {
@@ -277,34 +282,33 @@ static int32_t functionStmt()
         } while(skip(","));
         skip(")");
     }
-    // appendFunc(funcName, ntvCount, argsc); // append function
-    // emit(0x50 + EBP); // push ebp
-    // emit(0x89); emit(0xc0 + ESP * 8 + EBP); // mov ebp esp
-    // espBgn = ntvCount + 2;
-    // emit(0x81); emit(0xe8 + ESP); emitI32(0); // sub esp 0 ; align
-    int32_t argpos[128], i;
-    for(i = 0; i < argsc; i++) {
-    //     emit(0x8b); emit(0x45); emit(0x08 + (argsc - i - 1) * sizeof(int32_t));
-    //     emit(0x89); emit(0x44); emit(0x24);
-    //     argpos[i] = ntvCount; emit(0x00);
+    int func_addr = npc++;
+    dasm_growpc(&d, npc);
+
+    int func_esp = npc++;
+    dasm_growpc(&d, npc);
+
+    appendFunc(funcName, func_addr, func_esp, argsc); // append function
+
+    |=>func_addr:
+    | push ebp
+    | mov ebp, esp
+    | sub esp, 0x80000000
+    |=>func_esp:
+
+    for(int i = 0; i < argsc; i++) {
+        | mov eax, [ebp + ((argsc - i - 1) * sizeof(int32_t) + 8)]
+        | mov [ebp - (i + 2)*4], eax
     }
     eval(0, BLOCK_FUNC);
 
     for (--rets.count; rets.count >= 0; --rets.count) {
-    //     emitI32Insert(ntvCount - rets.addr[rets.count] - 4,
-    //                   rets.addr[rets.count]);
+        |=>rets.addr[rets.count]:
     }
     rets.count = 0;
 
-    // emit(0x81); emit(0xc0 + ESP);
-    // emitI32(sizeof(int32_t) * (varSize[nowFunc] + 6)); // add esp nn
-    // emit(0xc9); // leave
-    // emit(0xc3); // ret
-
-    // emitI32Insert(sizeof(int32_t) * (varSize[nowFunc] + 6), espBgn);
-    // for (i = 1; i <= argsc; i++)
-    //     ntvCode[argpos[i - 1]] = 256 - sizeof(int32_t) * i +
-    //         (((varSize[nowFunc] + 6) * sizeof(int32_t)) - 4);
+    | leave
+    | ret
 
     return 0;
 }
@@ -324,9 +328,10 @@ int expression(int pos, int status)
         functions.inside = IN_FUNC;
         mainFunc = ++nowFunc;
 
-        //    appendFunc("main", ntvCount, 0); // append function
-        main_esp = npc++;
+        int main_esp = npc++;
         dasm_growpc(&d, npc);
+
+        appendFunc("main", main_address, main_esp, 0); // append function
 
         |=>main_address:
         | push ebp
@@ -459,7 +464,8 @@ int (*parser())(int *, void **)
 
     uint8_t* buf = (uint8_t*)jit_finalize();
 
-    *(int*)(buf + dasm_getpclabel(&d, main_esp) - 4) = (varSize[mainFunc] + 6)*4;
+    for (int i = 0; i < functions.count; i++)
+        *(int*)(buf + dasm_getpclabel(&d, functions.func[i].espBgn) - 4) = (varSize[i+1] + 6)*4;
 
     dasm_free(&d);
     return ((int (*)(int *, void **))rubilabels[L_START]);

@@ -11,7 +11,7 @@ extern size_t jit_sz;
 extern int npc;
 
 typedef struct {
-    int address, args;
+    int address, args, espBgn;
     char name[0xFF];
 } func_t;
 

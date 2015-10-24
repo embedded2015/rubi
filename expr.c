@@ -62,11 +62,9 @@ static void primExpr()
                             skip(",");
                         }
                     }
-    //                 emit(0xe8); emitI32(0xFFFFFFFF -
-    //                                     (ntvCount - function->address) - 3);
-                        // call func
-    //                 emit(0x81); emit(0xc0 + ESP);
-    //                 emitI32(function->args * sizeof(int32_t)); // add esp %d
+                    // call func
+                    | call =>function->address
+                    | add esp, function->args * sizeof(int32_t)
                 }
                 if (!skip(")"))
                     error("func: %d: expected expression ')'",
