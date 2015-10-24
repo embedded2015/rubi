@@ -107,13 +107,13 @@ static void mulDivExpr()
         | mov ebx, eax
         | pop eax
         if (mul) {
-            | mul ebx
+            | imul ebx
         } else if (div) {
             | xor edx, edx
-            | div ebx
+            | idiv ebx
         } else { /* mod */
             | xor edx, edx
-            | div ebx
+            | idiv ebx
             | mov eax, edx
         }
     }
