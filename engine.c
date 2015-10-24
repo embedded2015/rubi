@@ -141,8 +141,7 @@ static int execute(char *source)
 
     int (*jit_main)(int*, void**) = parser();
 
-    int res = jit_main(0, funcTable);
-    printf("=> %d\n", res);
+    jit_main(0, funcTable);
 
     dispose();
     return 0;
