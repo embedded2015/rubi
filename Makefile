@@ -12,7 +12,7 @@ engine.o: engine.c rubi.h
 	$(C) -o $@ -c engine.c
 
 codegen.o: parser.h parser.dasc expr.dasc stdlib.dasc minilua
-	type parser.dasc expr.dasc stdlib.dasc | minilua dynasm/dynasm.lua -o codegen.c -D WIN -
+	cat parser.dasc expr.dasc stdlib.dasc | ./minilua dynasm/dynasm.lua -o codegen.c -
 	$(C) -o $@ -c codegen.c
 
 clean:
