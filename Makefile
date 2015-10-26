@@ -1,18 +1,16 @@
-ARCH = WIN
 CC = gcc
 CFLAGS = -Wall -m32 -g -std=gnu99
 C = $(CC) $(CFLAGS)
 
-rubi: engine.o parser.o
+rubi: engine.o codegen.o
 	$(C) -o $@ $^
 
 engine.o: engine.c rubi.h
 	$(C) -o $@ -c engine.c
 
-parser.o: parser.h parser.c expr.c stdlib.c
-	type parser.c expr.c stdlib.c > dasm.$(ARCH).c
-	minilua dynasm/dynasm.lua -o parser.$(ARCH).c -D $(ARCH) dasm.$(ARCH).c
-	$(C) -o $@ -c parser.$(ARCH).c
+codegen.o: parser.h parser.dasc expr.dasc stdlib.dasc
+	type parser.dasc expr.dasc stdlib.dasc | minilua dynasm/dynasm.lua -o codegen.c -D WIN -
+	$(C) -o $@ -c codegen.c
 
 clean:
-	$(RM) a.out rubi *.o *~ text *.$(ARCH).c
+	$(RM) a.out rubi *.o *~ text codegen.c
