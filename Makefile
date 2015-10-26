@@ -6,7 +6,7 @@ rubi: engine.o codegen.o
 	$(C) -o $@ $^
 
 minilua: dynasm/minilua.c
-	$(CC) -Wall -std=gnu99 -O2 -o $@ $<
+	$(CC) -Wall -std=gnu99 -O2 -o $@ $< -lm
 
 engine.o: engine.c rubi.h
 	$(C) -o $@ -c engine.c
