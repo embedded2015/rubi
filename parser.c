@@ -225,7 +225,8 @@ static int32_t functionStmt()
             tok.pos++;
             argsc++;
         } while(skip(","));
-        skip(")");
+        if (!skip(")"))
+                error("%d: expecting ')'", tok.tok[tok.pos].nline);
     }
     appendFunc(funcName, ntvCount, argsc); // append function
     emit(0x50 + EBP); // push ebp
