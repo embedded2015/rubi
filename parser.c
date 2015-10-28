@@ -225,7 +225,8 @@ static int32_t functionStmt()
             tok.pos++;
             argsc++;
         } while(skip(","));
-        skip(")");
+        if (!skip(")"))
+                error("%d: expecting ')'", tok.tok[tok.pos].nline);
     }
     appendFunc(funcName, ntvCount, argsc); // append function
     emit(0x50 + EBP); // push ebp
@@ -328,7 +329,8 @@ int expression(int pos, int status)
         emit(0xff); emit(0x56); emit(12 + 8); // call printf
     } else if (skip("for")) {
         assignment();
-        skip(",");
+        if (!skip(","))
+            error("%d: expecting ','", tok.tok[tok.pos].nline);
         whileStmt();
     } else if (skip("while")) {
         whileStmt();
