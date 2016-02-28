@@ -1,5 +1,6 @@
 #include "rubi.h"
 #include "parser.h"
+#include "lex.h"
 
 #if _WIN32
 #include <Windows.h>
