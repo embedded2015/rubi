@@ -37,10 +37,12 @@ struct {
     int data[0xFF];
 } gblVar;
 
-static Variable locVar[0xFF][0xFF];
-static int varSize[0xFF], varCounter;
+struct {
+    Variable var[0xFF][0xFF]; // var[ "functions.now" ] [ each variable ]
+    int count, size[0xFF];
+} locVar;
 
-static int nowFunc; // number of function                                              
+// strings embedded in native code
 struct {
     char *text[0xff];
     int *addr;
@@ -49,7 +51,7 @@ struct {
 
 struct {
     func_t func[0xff];
-    int count, inside;
+    int count, inside, now;
 } functions;
 
 #define NON 0
@@ -87,9 +89,9 @@ char* getString()
 Variable *getVar(char *name)
 {
     /* local variable */
-    for (int i = 0; i < varCounter; i++) {
-        if (!strcmp(name, locVar[nowFunc][i].name))
-            return &locVar[nowFunc][i];
+    for (int i = 0; i < locVar.count; i++) {
+        if (!strcmp(name, locVar.var[functions.now][i].name))
+            return &locVar.var[functions.now][i];
     }
     /* global variable */
     for (int i = 0; i < gblVar.count; i++) {
@@ -102,13 +104,13 @@ Variable *getVar(char *name)
 static Variable *appendVar(char *name, int type)
 {
     if (functions.inside == IN_FUNC) {
-        int32_t sz = 1 + ++varSize[nowFunc];
-        strcpy(locVar[nowFunc][varCounter].name, name);
-        locVar[nowFunc][varCounter].type = type;
-        locVar[nowFunc][varCounter].id = sz;
-        locVar[nowFunc][varCounter].loctype = V_LOCAL;
+        int32_t sz = 1 + ++locVar.size[functions.now];
+        strcpy(locVar.var[functions.now][locVar.count].name, name);
+        locVar.var[functions.now][locVar.count].type = type;
+        locVar.var[functions.now][locVar.count].id = sz;
+        locVar.var[functions.now][locVar.count].loctype = V_LOCAL;
 
-        return &locVar[nowFunc][varCounter++];
+        return &locVar.var[functions.now][locVar.count++];
     } else if (functions.inside == IN_GLOBAL) {
         /* global varibale */
         strcpy(gblVar.var[gblVar.count].name, name);
@@ -138,7 +140,7 @@ static func_t *appendFunc(char *name, int address, int espBgn, int args)
     return &functions.func[functions.count++];
 }
 
-static int32_t appendBreak()
+static int32_t make_break()
 {
     uint32_t lbl = npc++;
     dasm_growpc(&d, npc);
@@ -148,7 +150,7 @@ static int32_t appendBreak()
     return brks.count++;
 }
 
-static int32_t appendReturn()
+static int32_t make_return()
 {
     relExpr(); /* get argument */
 
@@ -273,7 +275,7 @@ static int32_t functionStmt()
 {
     int32_t argsc = 0;
     char *funcName = tok.tok[tok.pos++].val;
-    nowFunc++; functions.inside = IN_FUNC;
+    functions.now++; functions.inside = IN_FUNC;
     if (skip("(")) {
         do {
             declareVariable();
@@ -327,7 +329,7 @@ int expression(int pos, int status)
                strcmp("$", tok.tok[tok.pos+1].val) &&
                (tok.pos+1 == tok.size || strcmp(";", tok.tok[tok.pos+1].val))) { // main function entry
         functions.inside = IN_FUNC;
-        mainFunc = ++nowFunc;
+        mainFunc = ++functions.now;
 
         int main_esp = npc++;
         dasm_growpc(&d, npc);
@@ -393,7 +395,7 @@ int expression(int pos, int status)
     } else if (skip("while")) {
         whileStmt();
     } else if(skip("return")) {
-        appendReturn();
+        make_return();
     } else if(skip("if")) {
         ifStmt();
     } else if(skip("else")) {
@@ -421,7 +423,7 @@ int expression(int pos, int status)
         |=>endif:
         return 1;
     } else if (skip("break")) {
-        appendBreak();
+        make_break();
     } else if (skip("end")) {
         if (status == NON) {
             |=>pos:
@@ -467,7 +469,7 @@ int (*parser())(int *, void **)
     uint8_t* buf = (uint8_t*)jit_finalize();
 
     for (int i = 0; i < functions.count; i++)
-        *(int*)(buf + dasm_getpclabel(&d, functions.func[i].espBgn) - 4) = (varSize[i+1] + 6)*4;
+        *(int*)(buf + dasm_getpclabel(&d, functions.func[i].espBgn) - 4) = (locVar.size[i+1] + 6)*4;
 
     dasm_free(&d);
     return ((int (*)(int *, void **))rubilabels[L_START]);
