@@ -1,7 +1,7 @@
 CFLAGS = -Wall -m32 -g -mstackrealign -std=gnu99 -O2
 C = $(CC) $(CFLAGS)
 
-rubi: engine.o codegen.o
+rubi: lex.o engine.o codegen.o
 	$(C) -o $@ $^
 
 minilua: dynasm/minilua.c
@@ -9,6 +9,9 @@ minilua: dynasm/minilua.c
 
 engine.o: engine.c rubi.h
 	$(C) -o $@ -c engine.c
+
+lex.o: lex.c
+	$(C) -o $@ -c lex.c
 
 codegen.o: parser.h parser.dasc expr.dasc stdlib.dasc minilua
 	cat parser.dasc expr.dasc stdlib.dasc | ./minilua dynasm/dynasm.lua -o codegen.c -
