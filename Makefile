@@ -1,20 +1,18 @@
-CFLAGS = -Wall -m32 -mstackrealign -std=gnu99 -O2
+CFLAGS = -Wall -m32 -g -mstackrealign -std=gnu99 -O2
 C = $(CC) $(CFLAGS)
 
-rubi: engine.o expr.o parser.o stdlib.o
+rubi: engine.o codegen.o
 	$(C) -o $@ $^
 
-engine.o: rubi.h engine.c
-	$(C) -c engine.c
+minilua: dynasm/minilua.c
+	$(CC) -Wall -std=gnu99 -O2 -o $@ $< -lm
 
-expr.o: expr.h expr.c asm.h
-	$(C) -c expr.c
+engine.o: engine.c rubi.h
+	$(C) -o $@ -c engine.c
 
-parser.o: parser.h parser.c asm.h
-	$(C) -c parser.c
-
-stdlib.o: stdlib.c asm.h expr.h
-	$(C) -c stdlib.c
+codegen.o: parser.h parser.dasc expr.dasc stdlib.dasc minilua
+	cat parser.dasc expr.dasc stdlib.dasc | ./minilua dynasm/dynasm.lua -o codegen.c -
+	$(C) -o $@ -c codegen.c
 
 clean:
-	$(RM) a.out rubi *.o *~ text
+	$(RM) a.out rubi minilua *.o *~ text codegen.c

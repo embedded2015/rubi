@@ -5,6 +5,7 @@
 *.P
 *.elf
 *.bin
+*.exe
 *.hex
 *.map
 *.swp
@@ -15,4 +16,6 @@
 tags
 core
 rubi
+minilua
 text
+codegen.c

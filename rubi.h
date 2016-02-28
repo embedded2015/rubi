@@ -1,6 +1,8 @@
 #ifndef RUBI_INCLUDED
 #define RUBI_INCLUDED
 
+#include <stdint.h>
+
 enum { IN_GLOBAL = 0, IN_FUNC };
 
 enum { BLOCK_LOOP = 1, BLOCK_FUNC };

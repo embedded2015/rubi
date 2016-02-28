@@ -1,6 +1,11 @@
 #include "rubi.h"
 #include "parser.h"
-#include "asm.h"
+
+#if _WIN32
+#include <Windows.h>
+#else
+#include <sys/mman.h>
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,8 +13,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include <sys/mman.h>
-#include <sys/wait.h>
 
 struct {
     uint32_t addr[0xff];
@@ -21,12 +24,7 @@ static void set_xor128() { w = 1234 + (getpid() ^ 0xFFBA9285); }
 
 void init()
 {
-    long memsz = 0xFFFF + 1;
-    if (posix_memalign((void **) &ntvCode, memsz, memsz))
-        perror("posix_memalign");
-    if (mprotect(ntvCode, memsz, PROT_READ | PROT_WRITE | PROT_EXEC))
-        perror("mprotect");
-    tok.pos = ntvCount = 0;
+    tok.pos = 0;
     tok.size = 0xfff;
     set_xor128();
     tok.tok = calloc(sizeof(Token), tok.size);
@@ -45,7 +43,11 @@ static void freeAddr()
 
 void dispose()
 {
-    free(ntvCode);
+#ifdef _WIN32
+    VirtualFree(jit_buf, 0, MEM_RELEASE);
+#else
+    munmap(jit_buf, jit_sz);
+#endif
     free(brks.addr);
     free(rets.addr);
     free(tok.tok);
@@ -136,8 +138,11 @@ static int execute(char *source)
 {
     init();
     lex(source);
-    parser();
-    ((int (*)(int *, void **)) ntvCode)(0, funcTable);
+
+    int (*jit_main)(int*, void**) = parser();
+
+    jit_main(0, funcTable);
+
     dispose();
     return 0;
 }
