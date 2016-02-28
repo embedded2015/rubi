@@ -1,9 +1,12 @@
 #include "rubi.h"
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
 
 int32_t lex(char *code)
 {
     int32_t codeSize = strlen(code), line = 1;
-    int32_t is_crlf = 0;
+    int is_crlf = 0;
 
     for (int32_t i = 0; i < codeSize; i++) {
         if (tok.size <= i)
