@@ -31,7 +31,7 @@ static void primExpr()
                 if ((v = getVar(name)) == NULL)
                     error("%d: '%s' was not declared",
                           tok.tok[tok.pos].nline, name);
-                relExpr();
+                compExpr();
                 | mov ecx, eax
 
                 if (v->loctype == V_LOCAL) {
@@ -57,7 +57,7 @@ static void primExpr()
                     if (isalpha(val[0]) || isdigit(val[0]) ||
                         !strcmp(val, "\"") || !strcmp(val, "(")) { // has arg?
                         for (int i = 0; i < function->args; i++) {
-                            relExpr();
+                            compExpr();
                             | push eax
                             skip(",");
                         }
@@ -83,7 +83,7 @@ static void primExpr()
             }
         }
     } else if (skip("(")) {
-        if (isassign()) assignment(); else relExpr();
+        if (isassign()) assignment(); else compExpr();
         if (!skip(")")) error("%d: expected expression ')'",
                               tok.tok[tok.pos].nline);
     }
@@ -91,7 +91,7 @@ static void primExpr()
     while (isIndex()) {
         | mov ecx, eax
         skip("[");
-        relExpr();
+        compExpr();
         skip("]");
         | mov eax, [ecx + eax*4]
     }
@@ -136,7 +136,7 @@ static void addSubExpr()
     }
 }
 
-static void condExpr()
+static void logicExpr()
 {
     int32_t lt = 0, gt = 0, ne = 0, eql = 0, fle = 0;
     addSubExpr();
@@ -164,14 +164,14 @@ static void condExpr()
     }
 }
 
-void relExpr()
+void compExpr()
 {
     int and = 0, or = 0;
-    condExpr();
+    logicExpr();
     while ((and = skip("and") || skip("&")) ||
            (or = skip("or") || skip("|")) || (skip("xor") || skip("^"))) {
         | push eax
-        condExpr();
+        logicExpr();
         | mov ebx, eax
         | pop eax
         if (and)

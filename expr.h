@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-void relExpr();
+void compExpr();
 
 int32_t skip(char *s);
 

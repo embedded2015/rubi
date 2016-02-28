@@ -152,7 +152,7 @@ static int32_t make_break()
 
 static int32_t make_return()
 {
-    relExpr(); /* get argument */
+    compExpr(); /* get argument */
 
     int lbl = npc++;
     dasm_growpc(&d, npc);
@@ -221,7 +221,7 @@ static Variable *declareVariable()
 
 static int ifStmt()
 {
-    relExpr(); /* if condition */
+    compExpr(); /* if condition */
     uint32_t end = npc++;
     dasm_growpc(&d, npc);
     // didn't simply 'jz =>end' to prevent address diff too large
@@ -237,7 +237,7 @@ static int whileStmt()
     uint32_t loopBgn = npc++;
     dasm_growpc(&d, npc);
     |=>loopBgn:
-    relExpr(); /* condition */
+    compExpr(); /* condition */
     uint32_t stepBgn[2], stepOn = 0;
     if (skip(",")) {
         stepOn = 1;
@@ -357,7 +357,7 @@ int expression(int pos, int status)
                 | mov eax, getString()
                 isstring = 1;
             } else {
-                relExpr();
+                compExpr();
             }
             | push eax
             if (isstring) {
@@ -381,7 +381,7 @@ int expression(int pos, int status)
         if (skip(",")) {
             uint32_t a = 4;
             do {
-                relExpr();
+                compExpr();
                 | mov [esp + a], eax
                 a += 4;
             } while(skip(","));
@@ -412,7 +412,7 @@ int expression(int pos, int status)
         // jmp if/elsif/while end
         | jmp =>endif
         |=>pos:
-        relExpr(); /* if condition */
+        compExpr(); /* if condition */
         uint32_t end = npc++;
         dasm_growpc(&d, npc);
         | test eax, eax
@@ -429,7 +429,7 @@ int expression(int pos, int status)
             |=>pos:
         } else if (status == BLOCK_FUNC) functions.inside = IN_GLOBAL;
         return 1;
-    } else if (!skip(";")) { relExpr(); }
+    } else if (!skip(";")) { compExpr(); }
 
     return 0;
 }
@@ -511,10 +511,10 @@ int32_t assignment()
 
     if (v->loctype == V_LOCAL) {
         if (skip("[")) { // Array?
-            relExpr();
+            compExpr();
             | push eax
             if (skip("]") && skip("=")) {
-                relExpr();
+                compExpr();
                 // mov ecx, array
                 | mov ecx, [ebp - siz*v->id]
                 | pop edx
@@ -529,7 +529,7 @@ int32_t assignment()
                 error("%d: invalid assignment", tok.tok[tok.pos].nline);
         } else { // Scalar?
             if(skip("=")) {
-                relExpr();
+                compExpr();
             } else if((inc = skip("++")) || (dec = skip("--"))) {
                 // mov eax, varaible
                 | mov eax, [ebp - siz*v->id]
@@ -553,10 +553,10 @@ int32_t assignment()
             }
         } else {
             if (skip("[")) { // Array?
-                relExpr();
+                compExpr();
                 | push eax
                 if(skip("]") && skip("=")) {
-                    relExpr();
+                    compExpr();
                     // mov ecx GLOBAL_ADDR
                     | mov ecx, [v->id]
                     | pop edx
@@ -568,7 +568,7 @@ int32_t assignment()
                 } else error("%d: invalid assignment",
                              tok.tok[tok.pos].nline);
             } else if (skip("=")) {
-                relExpr();
+                compExpr();
                 | mov [v->id], eax
             } else if ((inc = skip("++")) || (dec = skip("--"))) {
                 // mov eax GLOBAL_ADDR

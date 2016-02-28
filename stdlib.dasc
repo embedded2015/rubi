@@ -18,7 +18,7 @@ int make_stdfunc(char *name)
     for (size_t i = 0; i < sizeof(stdfunc) / sizeof(stdfunc[0]); i++) {
         if (!strcmp(stdfunc[i].name, name)) {
             if(!strcmp(name, "Array")) {
-                relExpr(); // get array size
+                compExpr(); // get array size
                 | shl eax, 2
                 | mov [esp], eax
                 | call dword [esi + 12]
@@ -30,13 +30,13 @@ int make_stdfunc(char *name)
                 if (stdfunc[i].args == -1) { // vector
                     uint32_t a = 0;
                     do {
-                        relExpr();
+                        compExpr();
                         | mov [esp + a], eax
                         a += 4;
                     } while(skip(","));
                 } else {
                     for(int arg = 0; arg < stdfunc[i].args; arg++) {
-                        relExpr();
+                        compExpr();
                         | mov [esp + arg*4], eax
                         skip(",");
                     }
